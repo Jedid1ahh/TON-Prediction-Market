@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TON Prediction Market</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --ton-blue: #0088CC;
+            --ton-light-blue: #E5F7FF;
+            --ton-dark: #232328;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8f9fa;
+            color: var(--ton-dark);
+        }
+        
+        .navbar {
+            background-color: var(--ton-blue);
+        }
+        
+        .btn-primary {
+            background-color: var(--ton-blue);
+            border-color: var(--ton-blue);
+        }
+        
+        .btn-primary:hover {
+            background-color: #0077b6;
+            border-color: #0077b6;
+        }
+        
+        .btn-outline-primary {
+            color: var(--ton-blue);
+            border-color: var(--ton-blue);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--ton-blue);
+            border-color: var(--ton-blue);
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            background-color: var(--ton-light-blue);
+            border-bottom: none;
+            font-weight: bold;
+        }
+        
+        .market-card {
+            border-left: 4px solid var(--ton-blue);
+        }
+        
+        .market-created {
+            border-left: 4px solid #28a745;
+        }
+        
+        .wallet-card {
+            background: linear-gradient(45deg, var(--ton-blue), #00a8e8);
+            color: white;
+        }
+        
+        .badge-yes {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-no {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .badge-resolved {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        @media (max-width: 768px) {
+            .card {
+                margin-bottom: 15px;
+            }
+            
+            .wallet-info {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <strong>TON</strong> Prediction Market
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" id="markets-link">Markets</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="my-markets-link">My Markets</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="my-bets-link">My Bets</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <button id="connect-wallet-btn" class="btn btn-light">Connect Wallet</button>
+                    <div id="wallet-connected" class="d-none">
+                        <span class="badge bg-light text-dark me-2" id="wallet-balance">0 TON</span>
+                        <span class="badge bg-light text-dark" id="wallet-address">0x123...abc</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <div class="container" id="main-content">
+        <!-- Wallet Connection Card (initially hidden) -->
+        <div class="row mb-4 d-none" id="wallet-section">
+            <div class="col-md-6 offset-md-3">
+                <div class="card wallet-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center wallet-info">
+                            <div>
+                                <h5 class="card-title mb-1">TON Wallet</h5>
+                                <small id="displayed-wallet-address">0x123...abc</small>
+                            </div>
+                            <div>
+                                <h3 class="mb-0" id="displayed-wallet-balance">100 TON</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create Market Card -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Create New Prediction Market</span>
+                        <button class="btn btn-sm btn-primary" id="toggle-create-form">Create Market</button>
+                    </div>
+                    <div class="card-body d-none" id="create-market-form">
+                        <form id="market-form">
+                            <div class="mb-3">
+                                <label for="market-question" class="form-label">Question</label>
+                                <input type="text" class="form-control" id="market-question" placeholder="E.g., Will it rain tomorrow in New York?">
+                            </div>
+                            <div class="mb-3">
+                                <label for="market-description" class="form-label">Description</label>
+                                <textarea class="form-control" id="market-description" rows="2" placeholder="Provide additional details about the prediction market"></textarea>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="end-date" class="form-label">Betting End Date</label>
+                                    <input type="datetime-local" class="form-control" id="end-date">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="resolution-date" class="form-label">Resolution Date</label>
+                                    <input type="datetime-local" class="form-control" id="resolution-date">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Market Type</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="market-type" id="binary-type" checked>
+                                    <label class="form-check-label" for="binary-type">
+                                        Binary (Yes/No)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" id="cancel-create">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Create Market</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Markets List -->
+        <div class="row" id="markets-section">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>Active Markets</h4>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" id="all-markets-btn">All</button>
+                        <button type="button" class="btn btn-outline-primary" id="active-markets-btn">Active</button>
+                        <button type="button" class="btn btn-outline-primary" id="resolved-markets-btn">Resolved</button>
+                    </div>
+                </div>
+                
+                <div id="markets-container">
+                    <!-- Markets will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- My Markets Section (Initially Hidden) -->
+        <div class="row d-none" id="my-markets-section">
+            <div class="col-12">
+                <h4 class="mb-3">My Created Markets</h4>
+                <div id="my-markets-container">
+                    <!-- User created markets will be added here dynamically -->
+                    <div class="alert alert-info" id="no-markets-alert">
+                        You haven't created any prediction markets yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- My Bets Section (Initially Hidden) -->
+        <div class="row d-none" id="my-bets-section">
+            <div class="col-12">
+                <h4 class="mb-3">My Bets</h4>
+                <div id="my-bets-container">
+                    <!-- User bets will be added here dynamically -->
+                    <div class="alert alert-info" id="no-bets-alert">
+                        You haven't placed any bets yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Betting Modal -->
+    <div class="modal fade" id="betting-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-market-title">Place Your Bet</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="betting-form">
+                        <input type="hidden" id="betting-market-id">
+                        <div class="mb-3">
+                            <label class="form-label">Market Question</label>
+                            <p id="modal-market-question" class="fw-bold"></p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Your Prediction</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="prediction" id="pred-yes" value="yes" autocomplete="off" checked>
+                                <label class="btn btn-outline-success" for="pred-yes">Yes</label>
+                                
+                                <input type="radio" class="btn-check" name="prediction" id="pred-no" value="no" autocomplete="off">
+                                <label class="btn btn-outline-danger" for="pred-no">No</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="bet-amount" class="form-label">Bet Amount (TON)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="bet-amount" min="0.1" step="0.1" value="1">
+                                <span class="input-group-text">TON</span>
+                            </div>
+                            <div class="form-text">Current odds: <span id="current-odds">50% Yes / 50% No</span></div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <div>Potential Profit:</div>
+                                <div class="fw-bold" id="potential-profit">+0 TON</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="place-bet-btn">Place Bet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Resolution Modal -->
+    <div class="modal fade" id="resolution-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolve Market</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="resolving-market-id">
+                    <div class="mb-3">
+                        <label class="form-label">Market Question</label>
+                        <p id="resolution-market-question" class="fw-bold"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Resolution Outcome</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="resolution" id="res-yes" value="yes" autocomplete="off" checked>
+                            <label class="btn btn-outline-success" for="res-yes">Yes</label>
+                            
+                            <input type="radio" class="btn-check" name="resolution" id="res-no" value="no" autocomplete="off">
+                            <label class="btn btn-outline-danger" for="res-no">No</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="resolve-market-btn">Resolve Market</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast container for notifications -->
+    <div class="toast-container"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Simulated data
+        let currentWallet = null;
+        let markets = [];
+        let myBets = [];
+        let currentView = 'markets';
+        
+        // DOM References
+        const connectWalletBtn = document.getElementById('connect-wallet-btn');
+        const walletConnected = document.getElementById('wallet-connected');
+        const walletBalance = document.getElementById('wallet-balance');
+        const walletAddress = document.getElementById('wallet-address');
+        const walletSection = document.getElementById('wallet-section');
+        const displayedWalletBalance = document.getElementById('displayed-wallet-balance');
+        const displayedWalletAddress = document.getElementById('displayed-wallet-address');
+        const marketsLink = document.getElementById('markets-link');
+        const myMarketsLink = document.getElementById('my-markets-link');
+        const myBetsLink = document.getElementById('my-bets-link');
+        const marketsSection = document.getElementById('markets-section');
+        const myMarketsSection = document.getElementById('my-markets-section');
+        const myBetsSection = document.getElementById('my-bets-section');
+        const marketsContainer = document.getElementById('markets-container');
+        const myMarketsContainer = document.getElementById('my-markets-container');
+        const myBetsContainer = document.getElementById('my-bets-container');
+        const noMarketsAlert = document.getElementById('no-markets-alert');
+        const noBetsAlert = document.getElementById('no-bets-alert');
+        const toggleCreateFormBtn = document.getElementById('toggle-create-form');
+        const createMarketForm = document.getElementById('create-market-form');
+        const marketForm = document.getElementById('market-form');
+        const cancelCreateBtn = document.getElementById('cancel-create');
+        const allMarketsBtn = document.getElementById('all-markets-btn');
+        const activeMarketsBtn = document.getElementById('active-markets-btn');
+        const resolvedMarketsBtn = document.getElementById('resolved-markets-btn');
+        const bettingModal = new bootstrap.Modal(document.getElementById('betting-modal'));
+        const resolutionModal = new bootstrap.Modal(document.getElementById('resolution-modal'));
+        const placeBetBtn = document.getElementById('place-bet-btn');
+        const resolveMarketBtn = document.getElementById('resolve-market-btn');
+        
+        // Initialize with some sample markets
+        function initializeSampleData() {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const nextWeek = new Date(now);
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            
+            markets = [
+                {
+                    id: 1,
+                    question: "Will BTC price exceed $100,000 by end of the month?",
+                    description: "Market will be resolved based on CoinMarketCap price data at 23:59:59 UTC on the last day of the month.",
+                    creator: "0x9876543210abcdef",
+                    createdAt: new Date(now.getTime() - 86400000 * 3),
+                    endDate: new Date(now.getTime() + 86400000 * 25),
+                    resolutionDate: new Date(now.getTime() + 86400000 * 26),
+                    status: "active",
+                    totalYesBets: 250,
+                    totalNoBets: 175,
+                    yesOdds: 0.59,
+                    noOdds: 0.41,
+                    outcome: null
+                },
+                {
+                    id: 2,
+                    question: "Will the Federal Reserve cut interest rates at their next meeting?",
+                    description: "Market will be resolved based on the official announcement from the Federal Reserve.",
+                    creator: "0xabcdef1234567890",
+                    createdAt: new Date(now.getTime() - 86400000 * 5),
+                    endDate: new Date(now.getTime() + 86400000 * 12),
+                    resolutionDate: new Date(now.getTime() + 86400000 * 13),
+                    status: "active",
+                    totalYesBets: 420,
+                    totalNoBets: 580,
+                    yesOdds: 0.42,
+                    noOdds: 0.58,
+                    outcome: null
+                },
+                {
+                    id: 3,
+                    question: "Will it rain in New York City tomorrow?",
+                    description: "Market will be resolved based on weather data from the National Weather Service. Any precipitation counts as rain.",
+                    creator: "0x1234567890abcdef",
+                    createdAt: new Date(now.getTime() - 86400000 * 1),
+                    endDate: tomorrow,
+                    resolutionDate: new Date(tomorrow.getTime() + 86400000),
+                    status: "active",
+                    totalYesBets: 75,
+                    totalNoBets: 125,
+                    yesOdds: 0.38,
+                    noOdds: 0.62,
+                    outcome: null
+                },
+                {
+                    id: 4,
+                    question: "Will TON price be above $5 by the end of the week?",
+                    description: "Market will be resolved based on CoinGecko price data at 23:59:59 UTC on Sunday.",
+                    creator: "0x5432109876abcdef",
+                    createdAt: new Date(now.getTime() - 86400000 * 10),
+                    endDate: new Date(now.getTime() - 86400000 * 3),
+                    resolutionDate: new Date(now.getTime() - 86400000 * 2),
+                    status: "resolved",
+                    totalYesBets: 300,
+                    totalNoBets: 200,
+                    yesOdds: 0.6,
+                    noOdds: 0.4,
+                    outcome: "yes"
+                }
+            ];
+            
+            renderMarkets();
+        }
+        
+        // Wallet functions
+        function connectWallet() {
+            // Simulate wallet connection
+            currentWallet = {
+                address: '0x123456789abcdef',
+                shortAddress: '0x123...def',
+                balance: 100 // TON
+            };
+            
+            walletConnected.classList.remove('d-none');
+            connectWalletBtn.classList.add('d-none');
+            walletBalance.textContent = `${currentWallet.balance} TON`;
+            walletAddress.textContent = currentWallet.shortAddress;
+            
+            walletSection.classList.remove('d-none');
+            displayedWalletBalance.textContent = `${currentWallet.balance} TON`;
+            displayedWalletAddress.textContent = currentWallet.shortAddress;
+            
+            showToast('Wallet connected successfully!', 'success');
+            renderMarkets();
+        }
+        
+        // Market rendering functions
+        function renderMarkets(filter = 'all') {
+            marketsContainer.innerHTML = '';
+            
+            let filteredMarkets = markets;
+            if (filter === 'active') {
+                filteredMarkets = markets.filter(market => market.status === 'active');
+            } else if (filter === 'resolved') {
+                filteredMarkets = markets.filter(market => market.status === 'resolved');
+            }
+            
+            if (filteredMarkets.length === 0) {
+                marketsContainer.innerHTML = `
+                    <div class="alert alert-info">
+                        No ${filter !== 'all' ? filter : ''} markets available.
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredMarkets.forEach(market => {
+                const card = document.createElement('div');
+                card.className = `card market-card ${market.status === 'resolved' ? 'border-info' : ''}`;
+                
+                const canPlaceBet = market.status === 'active' && 
+                                  (currentWallet && market.creator !== currentWallet.address) && 
+                                  (new Date(market.endDate) > new Date());
+                
+                const canResolve = market.status === 'active' && 
+                                 (currentWallet && market.creator === currentWallet.address) && 
+                                 (new Date(market.resolutionDate) <= new Date());
+                
+                const statusBadge = market.status === 'active' 
+                    ? '<span class="badge badge-pending">Active</span>'
+                    : `<span class="badge badge-resolved">Resolved: ${market.outcome === 'yes' ? 'Yes' : 'No'}</span>`;
+                
+                card.innerHTML = `
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            ${statusBadge}
+                            <span class="ms-2">${formatTimeRemaining(market)}</span>
+                        </div>
+                        <small>ID: ${market.id}</small>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">${market.question}</h5>
+                        <p class="card-text">${market.description}</p>
+                        
+                        <div class="progress mb-3" style="height: 25px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: ${market.yesOdds * 100}%" 
+                                 aria-valuenow="${market.yesOdds * 100}" aria-valuemin="0" aria-valuemax="100">
+                                 Yes ${Math.round(market.yesOdds * 100)}%
+                            </div>
+                            <div class="progress-bar bg-danger" role="progressbar" style="width: ${market.noOdds * 100}%" 
+                                 aria-valuenow="${market.noOdds * 100}" aria-valuemin="0" aria-valuemax="100">
+                                 No ${Math.round(market.noOdds * 100)}%
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small>Created by: ${market.creator.substring(0, 6)}...${market.creator.substring(market.creator.length - 4)}</small>
+                                <br>
+                                <small>Total Volume: ${market.totalYesBets + market.totalNoBets} TON</small>
+                            </div>
+                            <div>
+                                ${canPlaceBet ? 
+                                    `<button class="btn btn-primary btn-sm place-bet-btn" data-market-id="${market.id}">Place Bet</button>` : 
+                                    canResolve ? 
+                                    `<button class="btn btn-info btn-sm resolve-market-btn" data-market-id="${market.id}">Resolve Market</button>` :
+                                    ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                marketsContainer.appendChild(card);
+            });
+            
+            // Add event listeners to the newly created buttons
+            document.querySelectorAll('.place-bet-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const marketId = parseInt(e.target.getAttribute('data-market-id'));
+                    openBettingModal(marketId);
+                });
+            });
+            
+            document.querySelectorAll('.resolve-market-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const marketId = parseInt(e.target.getAttribute('data-market-id'));
+                    openResolutionModal(marketId);
+                });
+            });
+        }
+        
+        function renderMyMarkets() {
+            if (!currentWallet) return;
+            
+            const myCreatedMarkets = markets.filter(market => market.creator === currentWallet.address);
+            
+            if (myCreatedMarkets.length === 0) {
+                noMarketsAlert.classList.remove('d-none');
+                myMarketsContainer.innerHTML = '';
+                return;
+            }
+            
+            noMarketsAlert.classList.add('d-none');
+            myMarketsContainer.innerHTML = '';
+            
+            myCreatedMarkets.forEach(market => {
+                const card = document.createElement('div');
+                card.className = `card market-created ${market.status === 'resolved' ? 'border-info' : ''}`;
+                
+                const canResolve = market.status === 'active' && (new Date(market.resolutionDate) <= new Date());
+                
+                const statusBadge = market.status === 'active' 
+                    ? '<span class="badge badge-pending">Active</span>'
+                    : `<span class="badge badge-resolved">Resolved: ${market.outcome === 'yes' ? 'Yes' : 'No'}</span>`;
+                
+                card.innerHTML = `
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            ${statusBadge}
+                            <span class="ms-2">${formatTimeRemaining(market)}</span>
+                        </div>
+                        <small>ID: ${market.id}</small>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">${market.question}</h5>
+                        <p class="card-text">${market.description}</p>
+                        
+                        <div class="progress mb-3" style="height: 25px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: ${market.yesOdds * 100}%" 
+                                 aria-valuenow="${market.yesOdds * 100}" aria-valuemin="0" aria-valuemax="100">
+                                 Yes ${Math.round(market.yesOdds * 100)}%
+                            </div>
+                            <div class="progress-bar bg-danger" role="progressbar" style="width: ${market.noOdds * 100}%" 
+                                 aria-valuenow="${market.noOdds * 100}" aria-valuemin="0" aria-valuemax="100">
+                                 No ${Math.round(market.noOdds * 100)}%
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small>Created: ${formatDate(market.createdAt)}</small>
+                                <br>
+                                <small>Total Volume: ${market.totalYesBets + market.totalNoBets} TON</small>
+                            </div>
+                            <div>
+                                ${canResolve ? 
+                                    `<button class="btn btn-info btn-sm resolve-market-btn" data-market-id="${market.id}">Resolve Market</button>` : 
+                                    market.status === 'resolved' ? 
+                                    '<span class="badge badge-resolved">Resolved</span>' : 
+                                    '<span class="badge badge-pending">Waiting for resolution date</span>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                myMarketsContainer.appendChild(card);
+            });
+            
+            // Add event listeners to the newly created buttons
+            document.querySelectorAll('.resolve-market-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const marketId = parseInt(e.target.getAttribute('data-market-id'));
+                    openResolutionModal(marketId);
+                });
+            });
+        }
+        
+        function renderMyBets() {
+            if (!currentWallet) return;
+            
+            if (myBets.length === 0) {
+                noBetsAlert.classList.remove('d-none');
+                myBetsContainer.innerHTML = '';
+                return;
+            }
+            
+            noBetsAlert.classList.add('d-none');
+            myBetsContainer.innerHTML = '';
+            
+            myBets.forEach(bet => {
+                const market = markets.find(m => m.id === bet.marketId);
+                if (!market) return;
+                
+                const card = document.createElement('div');
+                card.className = 'card mb-3';
+                
+                let profitLoss = 0;
+                let resultText = '';
+                
+                if (market.status === 'resolved') {
+                    if (market.outcome === bet.prediction) {
+                        // Winner
+                        profitLoss = bet.amount / (bet.prediction === 'yes' ? market.yesOdds : market.noOdds);
+                        resultText = `<span class="text-success">+${profitLoss.toFixed(2)} TON</span>`;
+                    } else {
+                        // Loser
+                        profitLoss = -bet.amount;
+                        resultText = `<span class="text-danger">${profitLoss.toFixed(2)} TON</span>`;
+                    }
+                } else {
+                    resultText = '<span class="text-muted">Pending</span>';
+                }
+                
+                card.innerHTML = `
+                    <div class="card-body">
+                        <h5 class="card-title">${market.question}</h5>
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>
+                                <span class="badge ${bet.prediction === 'yes' ? 'badge-yes' : 'badge-no'}">
+                                    ${bet.prediction === 'yes' ? 'Yes' : 'No'}
+                                </span>
+                                <span class="ms-2">${bet.amount} TON</span>
+                            </div>
+                            <div>
+                                ${market.status === 'resolved' ? 
+                                    `<span class="badge ${market.outcome === bet.prediction ? 'badge-yes' : 'badge-no'}">
+                                        ${market.outcome === bet.prediction ? 'Won' : 'Lost'}
+                                     </span>` : 
+                                    '<span class="badge badge-pending">Pending</span>'}
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">Placed: ${formatDate(bet.placedAt)}</small>
+                            <div>Result: ${resultText}</div>
+                        </div>
+                    </div>
+                `;
+                
+                myBetsContainer.appendChild(card);
+            });
+        }
+        
+        // Modal handlers
+        function openBettingModal(marketId) {
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            const market = markets.find(m => m.id === marketId);
+            if (!market) return;
+            
+            // Check if the user is the creator of this market
+            if (market.creator === currentWallet.address) {
+                showToast('You cannot bet on markets you created', 'warning');
+                return;
+            }
+            
+            document.getElementById('betting-market-id').value = marketId;
+            document.getElementById('modal-market-question').textContent = market.question;
+            document.getElementById('current-odds').textContent = 
+                `${Math.round(market.yesOdds * 100)}% Yes / ${Math.round(market.noOdds * 100)}% No`;
+            
+            // Calculate potential profit
+            calculatePotentialProfit();
+            
+            bettingModal.show();
+        }
+        
+        function calculatePotentialProfit() {
+            const marketId = parseInt(document.getElementById('betting-market-id').value);
+            const market = markets.find(m => m.id === marketId);
+            if (!market) return;
+            
+            const betAmount = parseFloat(document.getElementById('bet-amount').value) || 0;
+            const prediction = document.querySelector('input[name="prediction"]:checked').value;
+            
+            let potentialProfit = 0;
+            if (prediction === 'yes') {
+                potentialProfit = betAmount / market.yesOdds - betAmount;
+            } else {
+                potentialProfit = betAmount / market.noOdds - betAmount;
+            }
+            
+            document.getElementById('potential-profit').textContent = `+${potentialProfit.toFixed(2)} TON`;
+        }
+        
+        function placeBet() {
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            const marketId = parseInt(document.getElementById('betting-market-id').value);
+            const betAmount = parseFloat(document.getElementById('bet-amount').value);
+            const prediction = document.querySelector('input[name="prediction"]:checked').value;
+            
+            if (isNaN(betAmount) || betAmount <= 0) {
+                showToast('Please enter a valid bet amount', 'warning');
+                return;
+            }
+            
+            if (betAmount > currentWallet.balance) {
+                showToast('Insufficient balance', 'error');
+                return;
+            }
+            
+            const market = markets.find(m => m.id === marketId);
+            if (!market) {
+                showToast('Market not found', 'error');
+                return;
+            }
+            
+            // Update wallet balance
+            currentWallet.balance -= betAmount;
+            walletBalance.textContent = `${currentWallet.balance.toFixed(2)} TON`;
+            displayedWalletBalance.textContent = `${currentWallet.balance.toFixed(2)} TON`;
+            
+            // Update market odds
+            if (prediction === 'yes') {
+                market.totalYesBets += betAmount;
+            } else {
+                market.totalNoBets += betAmount;
+            }
+            
+            // Recalculate odds
+            const total = market.totalYesBets + market.totalNoBets;
+            market.yesOdds = market.totalYesBets / total;
+            market.noOdds = market.totalNoBets / total;
+            
+            // Add to my bets
+            myBets.push({
+                id: myBets.length + 1,
+                marketId: marketId,
+                prediction: prediction,
+                amount: betAmount,
+                placedAt: new Date()
+            });
+            
+            bettingModal.hide();
+            showToast('Bet placed successfully!', 'success');
+            
+            // Re-render everything
+            renderMarkets();
+            if (currentView === 'my-bets') {
+                renderMyBets();
+            }
+        }
+        
+        function openResolutionModal(marketId) {
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            const market = markets.find(m => m.id === marketId);
+            if (!market) return;
+            
+            // Check if the user is the creator of this market
+            if (market.creator !== currentWallet.address) {
+                showToast('Only the market creator can resolve this market', 'warning');
+                return;
+            }
+            
+            document.getElementById('resolving-market-id').value = marketId;
+            document.getElementById('resolution-market-question').textContent = market.question;
+            
+            resolutionModal.show();
+        }
+        
+        function resolveMarket() {
+            const marketId = parseInt(document.getElementById('resolving-market-id').value);
+            const outcome = document.querySelector('input[name="resolution"]:checked').value;
+            
+            const market = markets.find(m => m.id === marketId);
+            if (!market) {
+                showToast('Market not found', 'error');
+                return;
+            }
+            
+            // Update market status
+            market.status = 'resolved';
+            market.outcome = outcome;
+            
+            // Simulate payouts (in a real system, this would be done on-chain)
+            myBets.forEach(bet => {
+                if (bet.marketId === marketId) {
+                    if (bet.prediction === outcome) {
+                        // Winner
+                        const winnings = bet.amount / (outcome === 'yes' ? market.yesOdds : market.noOdds);
+                        currentWallet.balance += winnings;
+                    }
+                    // Losers get nothing
+                }
+            });
+            
+            // Update UI
+            walletBalance.textContent = `${currentWallet.balance.toFixed(2)} TON`;
+            displayedWalletBalance.textContent = `${currentWallet.balance.toFixed(2)} TON`;
+            
+            resolutionModal.hide();
+            showToast('Market resolved successfully!', 'success');
+            
+            // Re-render everything
+            renderMarkets();
+            if (currentView === 'my-markets') {
+                renderMyMarkets();
+            }
+            if (currentView === 'my-bets') {
+                renderMyBets();
+            }
+        }
+        
+        // Utility functions
+        function formatDate(date) {
+            return new Date(date).toLocaleString();
+        }
+        
+        function formatTimeRemaining(market) {
+            const now = new Date();
+            let targetDate;
+            let prefix;
+            
+            if (market.status === 'active') {
+                if (new Date(market.endDate) > now) {
+                    targetDate = new Date(market.endDate);
+                    prefix = 'Betting ends in:';
+                } else {
+                    targetDate = new Date(market.resolutionDate);
+                    prefix = 'Resolution in:';
+                }
+            } else {
+                return 'Resolved';
+            }
+            
+            const diffTime = Math.abs(targetDate - now);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            
+            if (diffDays > 0) {
+                return `${prefix} ${diffDays}d ${diffHours}h`;
+            } else {
+                const diffMinutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+                return `${prefix} ${diffHours}h ${diffMinutes}m`;
+            }
+        }
+        
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'warning' ? 'warning' : type === 'error' ? 'danger' : 'primary'}`;
+            toast.setAttribute('role', 'alert');
+            toast.setAttribute('aria-live', 'assertive');
+            toast.setAttribute('aria-atomic', 'true');
+            
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 3000
+            });
+            
+            bsToast.show();
+            
+            // Remove toast from DOM after it's hidden
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+        
+        // Event listeners
+        connectWalletBtn.addEventListener('click', connectWallet);
+        
+        toggleCreateFormBtn.addEventListener('click', () => {
+            createMarketForm.classList.toggle('d-none');
+            toggleCreateFormBtn.textContent = createMarketForm.classList.contains('d-none') ? 'Create Market' : 'Cancel';
+        });
+        
+        cancelCreateBtn.addEventListener('click', () => {
+            createMarketForm.classList.add('d-none');
+            toggleCreateFormBtn.textContent = 'Create Market';
+            marketForm.reset();
+        });
+        
+        marketForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            const question = document.getElementById('market-question').value.trim();
+            const description = document.getElementById('market-description').value.trim();
+            const endDate = document.getElementById('end-date').value;
+            const resolutionDate = document.getElementById('resolution-date').value;
+            
+            if (!question || !description || !endDate || !resolutionDate) {
+                showToast('Please fill in all fields', 'warning');
+                return;
+            }
+            
+            if (new Date(endDate) >= new Date(resolutionDate)) {
+                showToast('Resolution date must be after betting end date', 'warning');
+                return;
+            }
+            
+            if (new Date(endDate) <= new Date()) {
+                showToast('Betting end date must be in the future', 'warning');
+                return;
+            }
+            
+            // Create new market
+            const newMarket = {
+                id: markets.length + 1,
+                question,
+                description,
+                creator: currentWallet.address,
+                createdAt: new Date(),
+                endDate: new Date(endDate),
+                resolutionDate: new Date(resolutionDate),
+                status: 'active',
+                totalYesBets: 0.1, // Small seed to avoid division by zero
+                totalNoBets: 0.1,  // Small seed to avoid division by zero
+                yesOdds: 0.5,
+                noOdds: 0.5,
+                outcome: null
+            };
+            
+            markets.push(newMarket);
+            
+            showToast('Market created successfully!', 'success');
+            createMarketForm.classList.add('d-none');
+            toggleCreateFormBtn.textContent = 'Create Market';
+            marketForm.reset();
+            
+            renderMarkets();
+            if (currentView === 'my-markets') {
+                renderMyMarkets();
+            }
+        });
+        
+        marketsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentView = 'markets';
+            
+            marketsLink.classList.add('active');
+            myMarketsLink.classList.remove('active');
+            myBetsLink.classList.remove('active');
+            
+            marketsSection.classList.remove('d-none');
+            myMarketsSection.classList.add('d-none');
+            myBetsSection.classList.add('d-none');
+            
+            renderMarkets();
+        });
+        
+        myMarketsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            currentView = 'my-markets';
+            
+            marketsLink.classList.remove('active');
+            myMarketsLink.classList.add('active');
+            myBetsLink.classList.remove('active');
+            
+            marketsSection.classList.add('d-none');
+            myMarketsSection.classList.remove('d-none');
+            myBetsSection.classList.add('d-none');
+            
+            renderMyMarkets();
+        });
+        
+        myBetsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            if (!currentWallet) {
+                showToast('Please connect your wallet first', 'warning');
+                return;
+            }
+            
+            currentView = 'my-bets';
+            
+            marketsLink.classList.remove('active');
+            myMarketsLink.classList.remove('active');
+            myBetsLink.classList.add('active');
+            
+            marketsSection.classList.add('d-none');
+            myMarketsSection.classList.add('d-none');
+            myBetsSection.classList.remove('d-none');
+            
+            renderMyBets();
+        });
+        
+        allMarketsBtn.addEventListener('click', () => {
+            allMarketsBtn.classList.add('active');
+            activeMarketsBtn.classList.remove('active');
+            resolvedMarketsBtn.classList.remove('active');
+            renderMarkets('all');
+        });
+        
+        activeMarketsBtn.addEventListener('click', () => {
+            allMarketsBtn.classList.remove('active');
+            activeMarketsBtn.classList.add('active');
+            resolvedMarketsBtn.classList.remove('active');
+            renderMarkets('active');
+        });
+        
+        resolvedMarketsBtn.addEventListener('click', () => {
+            allMarketsBtn.classList.remove('active');
+            activeMarketsBtn.classList.remove('active');
+            resolvedMarketsBtn.classList.add('active');
+            renderMarkets('resolved');
+        });
+        
+        document.getElementById('bet-amount').addEventListener('input', calculatePotentialProfit);
+        document.querySelectorAll('input[name="prediction"]').forEach(input => {
+            input.addEventListener('change', calculatePotentialProfit);
+        });
+        
+        placeBetBtn.addEventListener('click', placeBet);
+        resolveMarketBtn.addEventListener('click', resolveMarket);
+        
+        // Initialize
+        initializeSampleData();
+    </script>
+</body>
+</html>
